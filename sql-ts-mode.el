@@ -263,9 +263,48 @@
 (defconst sql-ts--statement-regexp (rx bos "statement" eos)
   "Regexp matching the type of a SQL statement node.")
 
+(defun sql-ts--statement-at-or-after (pos)
+  "Return the SQL statement at POS, or the next one, or nil."
+  (when-let* ((node (or (treesit-thing-at pos 'defun) (treesit-thing-next pos 'defun))))
+    (treesit-node-top-level node 'defun t)))
+
+(defun sql-ts--statement-bounds (node)
+  "Return the (START . END) of the SQL statement NODE, semicolon included."
+  (let ((next (treesit-node-next-sibling node)))
+    (cons (treesit-node-start node) (treesit-node-end (if (and next (string-equal (treesit-node-type next) ";")) next node)))))
+
+(defun sql-ts--statement-region ()
+  "Return the (START . END) of the statement to send from point."
+  (if-let* ((node (sql-ts--statement-at-or-after (point))))
+      (sql-ts--statement-bounds node)
+    (user-error "No SQL statement at or after point")))
+
+(defun sql-ts-send-statement ()
+  "Send the SQL statement at point to the SQLi buffer."
+  (interactive nil sql-ts-mode)
+  (pcase-let ((`(,start . ,end) (sql-ts--statement-region)))
+    (sql-send-region start end)))
+
+(defun sql-ts-send-statement-and-next ()
+  "Send the SQL statement at point, then move to the next one."
+  (interactive nil sql-ts-mode)
+  (pcase-let ((`(,start . ,end) (sql-ts--statement-region)))
+    (sql-send-region start end)
+    (goto-char end)
+    (when-let* ((next (sql-ts--statement-at-or-after end)))
+      (goto-char (treesit-node-start next)))))
+
+(defvar-keymap sql-ts-mode-map
+  :doc "Keymap for `sql-ts-mode'."
+  :parent (make-composed-keymap sql-mode-map prog-mode-map)
+  "C-c C-c" #'sql-ts-send-statement
+  "C-c C-n" #'sql-ts-send-statement-and-next)
+
 ;;;###autoload
 (define-derived-mode sql-ts-mode prog-mode "SQL"
-  "Major mode for editing SQL, powered by tree-sitter."
+  "Major mode for editing SQL, powered by tree-sitter.
+
+\\{sql-ts-mode-map}"
   :abbrev-table sql-mode-abbrev-table
 
   ;; Taken from `sql-mode'.
