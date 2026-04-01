@@ -6,7 +6,7 @@
 ;; URL: https://github.com/emacs-pe/sql-ts-mode
 ;; Keywords: sql languages tree-sitter
 ;; Version: 0.1
-;; Package-Requires: ((emacs "29.1"))
+;; Package-Requires: ((emacs "30.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -61,88 +61,35 @@
 (require 'treesit)
 (require 'sql)
 
+(if (fboundp 'treesit-declare-unavailable-functions) ; Emacs 31.1
+    (treesit-declare-unavailable-functions)
+  (declare-function treesit-language-available-p "treesit.c")
+  (declare-function treesit-node-child "treesit.c")
+  (declare-function treesit-node-child-by-field-name "treesit.c")
+  (declare-function treesit-node-end "treesit.c")
+  (declare-function treesit-node-match-p "treesit.c")
+  (declare-function treesit-node-next-sibling "treesit.c")
+  (declare-function treesit-node-start "treesit.c")
+  (declare-function treesit-node-type "treesit.c")
+  (declare-function treesit-parser-create "treesit.c")
+  (declare-function treesit-search-subtree "treesit.c"))
+
+(add-to-list
+ 'treesit-language-source-alist
+ '(sql "https://github.com/DerekStride/tree-sitter-sql"
+       :commit "7b51ecda191d36b92f5a90a8d1bc3faef1c7b8b8") ; v0.3.11
+ t)
+
 (defgroup sql-ts nil
   "Major mode for editing SQL files."
   :prefix "sql-ts-"
-  :group 'languages)
+  :group 'languages
+  :group 'SQL)
 
 (defcustom sql-ts-indent-offset 4
   "Number of spaces for each indentation step in `sql-ts-mode'."
-  :type 'integer
-  :safe 'integerp)
-
-(defvar sql-ts--keywords
-  '((keyword_select) (keyword_from) (keyword_where) (keyword_index)
-    (keyword_join) (keyword_primary) (keyword_delete) (keyword_create)
-    (keyword_show) (keyword_unload) (keyword_insert) (keyword_merge)
-    (keyword_distinct) (keyword_replace) (keyword_update)
-    (keyword_into) (keyword_overwrite) (keyword_matched)
-    (keyword_values) (keyword_value) (keyword_attribute) (keyword_set)
-    (keyword_left) (keyword_right) (keyword_outer) (keyword_inner)
-    (keyword_full) (keyword_order) (keyword_partition) (keyword_group)
-    (keyword_with) (keyword_without) (keyword_as) (keyword_having)
-    (keyword_limit) (keyword_offset) (keyword_table) (keyword_tables)
-    (keyword_key) (keyword_references) (keyword_foreign)
-    (keyword_constraint) (keyword_force) (keyword_use) (keyword_for)
-    (keyword_if) (keyword_exists) (keyword_column) (keyword_columns)
-    (keyword_cross) (keyword_lateral) (keyword_natural)
-    (keyword_alter) (keyword_drop) (keyword_add) (keyword_view)
-    (keyword_end) (keyword_is) (keyword_using) (keyword_between)
-    (keyword_window) (keyword_no) (keyword_data) (keyword_type)
-    (keyword_rename) (keyword_to) (keyword_schema) (keyword_owner)
-    (keyword_authorization) (keyword_all) (keyword_any) (keyword_some)
-    (keyword_returning) (keyword_begin) (keyword_commit)
-    (keyword_rollback) (keyword_transaction) (keyword_only)
-    (keyword_like) (keyword_similar) (keyword_over) (keyword_change)
-    (keyword_modify) (keyword_after) (keyword_before) (keyword_range)
-    (keyword_rows) (keyword_groups) (keyword_exclude)
-    (keyword_current) (keyword_ties) (keyword_others)
-    (keyword_zerofill) (keyword_format) (keyword_fields) (keyword_row)
-    (keyword_sort) (keyword_compute) (keyword_comment)
-    (keyword_location) (keyword_cached) (keyword_uncached)
-    (keyword_lines) (keyword_stored) (keyword_virtual)
-    (keyword_partitioned) (keyword_analyze) (keyword_explain)
-    (keyword_verbose) (keyword_truncate) (keyword_rewrite)
-    (keyword_optimize) (keyword_vacuum) (keyword_cache)
-    (keyword_language) (keyword_called) (keyword_conflict)
-    (keyword_declare) (keyword_filter) (keyword_function)
-    (keyword_input) (keyword_name) (keyword_oid) (keyword_oids)
-    (keyword_precision) (keyword_regclass) (keyword_regnamespace)
-    (keyword_regproc) (keyword_regtype) (keyword_restricted)
-    (keyword_return) (keyword_returns) (keyword_separator)
-    (keyword_setof) (keyword_stable) (keyword_support)
-    (keyword_tblproperties) (keyword_trigger) (keyword_unsafe)
-    (keyword_admin) (keyword_connection) (keyword_cycle)
-    (keyword_database) (keyword_encrypted) (keyword_increment)
-    (keyword_logged) (keyword_none) (keyword_owned) (keyword_password)
-    (keyword_reset) (keyword_role) (keyword_sequence) (keyword_start)
-    (keyword_restart) (keyword_tablespace) (keyword_until)
-    (keyword_user) (keyword_valid) (keyword_action) (keyword_definer)
-    (keyword_invoker) (keyword_security) (keyword_extension)
-    (keyword_version) (keyword_out) (keyword_inout) (keyword_variadic)
-    (keyword_ordinality) (keyword_session) (keyword_isolation)
-    (keyword_level) (keyword_serializable) (keyword_repeatable)
-    (keyword_read) (keyword_write) (keyword_committed)
-    (keyword_uncommitted) (keyword_deferrable) (keyword_names)
-    (keyword_zone) (keyword_immediate) (keyword_deferred)
-    (keyword_constraints) (keyword_snapshot) (keyword_characteristics)
-    (keyword_off) (keyword_follows) (keyword_precedes) (keyword_each)
-    (keyword_instead) (keyword_of) (keyword_initially) (keyword_old)
-    (keyword_new) (keyword_referencing) (keyword_statement)
-    (keyword_execute) (keyword_procedure) (keyword_copy)
-    (keyword_delimiter) (keyword_encoding) (keyword_escape)
-    (keyword_force_not_null) (keyword_force_null)
-    (keyword_force_quote) (keyword_freeze) (keyword_header)
-    (keyword_match) (keyword_program) (keyword_quote) (keyword_stdin)
-    (keyword_extended) (keyword_main) (keyword_plain)
-    (keyword_storage) (keyword_compression) (keyword_duplicate)
-    ;; Conditionals
-    (keyword_case) (keyword_when) (keyword_then) (keyword_else)
-    ;; Operators
-    (keyword_in) (keyword_and) (keyword_or) (keyword_not) (keyword_by)
-    (keyword_on) (keyword_do) (keyword_union) (keyword_except)
-    (keyword_intersect))
-  "SQL keywords for tree-sitter font-locking.")
+  :type 'natnum
+  :safe 'natnump)
 
 (defvar sql-ts--builtins
   '((keyword_int) (keyword_null) (keyword_boolean) (keyword_binary)
@@ -161,7 +108,7 @@
     (keyword_timestamp) (keyword_timestamptz) (keyword_geometry)
     (keyword_geography) (keyword_box2d) (keyword_box3d)
     (keyword_interval))
-  "SQL built-in functions for tree-sitter font-locking.")
+  "SQL built-in types for tree-sitter font-locking.")
 
 (defvar sql-ts--attributes
   '((keyword_asc) (keyword_desc) (keyword_terminated)
@@ -172,67 +119,81 @@
     (keyword_generated) (keyword_preceding) (keyword_following)
     (keyword_first) (keyword_current_timestamp) (keyword_immutable)
     (keyword_atomic) (keyword_parallel) (keyword_leakproof)
-    (keyword_safe) (keyword_cost) (keyword_strict)))
+    (keyword_safe) (keyword_cost) (keyword_strict))
+  "SQL attribute keywords for tree-sitter font-locking.")
 
 (defvar sql-ts--operators
   '("+" "-" "*" "/" "%" "^" ":=" "=" "<" "<=" "!=" ">=" ">" "<>"
-    (op_other) (op_unary_other))
-  "SQL operators for tree-sitter font-locking.")
+    (op_other) (op_unary_other)
+    ;; Based on https://github.com/DerekStride/tree-sitter-sql/blob/v0.3.11/queries/highlights.scm#L404-L415
+    (keyword_in) (keyword_and) (keyword_or) (keyword_not) (keyword_by)
+    (keyword_on) (keyword_do) (keyword_union) (keyword_except)
+    (keyword_intersect))
+  "SQL operator nodes for tree-sitter font-locking.")
 
-(defvar sql-ts-mode--font-lock-settings
+(defsubst sql-ts--keyword-node-p (node)
+  "Check whether a NODE is a keyword."
+  (string-prefix-p "keyword_" (treesit-node-type node)))
+
+(defvar sql-ts--font-lock-settings
   (treesit-font-lock-rules
-   :language 'sql
+   :default-language 'sql
+
    :feature 'comment
    '([(comment) (marginalia)] @font-lock-comment-face)
 
-   :language 'sql
-   :feature 'bracket
-   '((["(" ")"]) @font-lock-bracket-face)
+   :feature 'punctuation
+   `((["(" ")"] @font-lock-bracket-face)
+     ([";" "," "."] @font-lock-delimiter-face)
+     ([,@sql-ts--operators] @font-lock-operator-face))
 
-   :language 'sql
-   :feature 'delimiter
-   '(([";" "," "."]) @font-lock-delimiter-face)
-
-   :language 'sql
-   :feature 'operator
-   `([,@sql-ts--operators] @font-lock-operator-face)
-
-   :language 'sql
    :feature 'builtin
    `([,@sql-ts--builtins] @font-lock-builtin-face)
 
-   :language 'sql
+   :feature 'number
+   '(((literal) @font-lock-number-face
+      (:match "\\`[-+]?[[:digit:]]*\\.?[[:digit:]]+\\(?:[eE][-+]?[[:digit:]]+\\)?\\'" @font-lock-number-face)))
+
    :feature 'constant
-   `([(keyword_true) (keyword_false)] @font-lock-constant-face)
+   '([(keyword_true) (keyword_false)] @font-lock-constant-face)
 
-   :language 'sql
-   :feature 'keyword
-   `([,@sql-ts--keywords] @font-lock-keyword-face)
-
-   :language 'sql
    :feature 'attribute
    `([,@sql-ts--attributes] @font-lock-preprocessor-face)
 
-   :language 'sql
    :feature 'string
    '((literal) @font-lock-string-face)
 
-   :language 'sql
-   :feature 'type
-   `((relation
-      (object_reference name: (identifier) @font-lock-type-face)))
-
-   :language 'sql
    :feature 'function
    '((invocation
       (object_reference name: (identifier) @font-lock-function-call-face))
+     (cast name: (keyword_cast) @font-lock-function-call-face)
      [(keyword_gist) (keyword_btree) (keyword_hash) (keyword_spgist)
-      (keyword_gin) (keyword_brin) (keyword_array)] @font-lock-function-call-face)
+      (keyword_gin) (keyword_brin) (keyword_array)]
+     @font-lock-function-call-face)
 
-   :language 'sql
+   :feature 'type
+   '((object_reference name: (identifier) @font-lock-type-face)
+     (object_reference schema: (identifier) @font-lock-type-face)
+     (cte (identifier) @font-lock-type-face))
+
+   :feature 'property
+   '((field name: (identifier) @font-lock-property-use-face)
+     (column (identifier) @font-lock-property-use-face)
+     (column_definition name: (identifier) @font-lock-property-name-face))
+
+   :feature 'variable
+   '((parameter) @font-lock-variable-name-face
+     (relation alias: (identifier) @font-lock-variable-name-face)
+     (term alias: (identifier) @font-lock-variable-name-face))
+
    :feature 'error
    :override t
-   '((ERROR) @font-lock-warning-face))
+   '((ERROR) @font-lock-warning-face)
+
+   ;; Any keyword_ that did not match the rules above.
+   :feature 'keyword
+   '(((_) @font-lock-keyword-face
+      (:pred sql-ts--keyword-node-p @font-lock-keyword-face))))
   "Tree-sitter font-lock settings for `sql-ts-mode'.")
 
 (defvar sql-ts--indent-rules
@@ -267,62 +228,118 @@
      ((parent-is "column_definitions") parent-bol sql-ts-indent-offset)))
   "Tree-sitter indent rules for `sql-ts-mode'.")
 
+(defun sql-ts--defun-name (node)
+  "Return the defun name of NODE."
+  (when-let* (((treesit-node-match-p node 'defun t))
+              (kind (treesit-node-child node 0 t)))
+    (let ((object
+           (or (treesit-node-child-by-field-name kind "column")
+               (treesit-node-child-by-field-name kind "name")
+               (treesit-node-child-by-field-name node "name")
+               (treesit-search-subtree
+                node
+                (lambda (n)
+                  (and (or (treesit-node-match-p n (rx bos "object_reference" eos))
+                           (string-equal (treesit-node-field-name n) "alias"))
+                       (not (treesit-parent-until n (rx bos (or "select_expression" "subquery" "invocation") eos)))))))))
+      (concat (string-replace "_" " " (string-remove-prefix "keyword_" (treesit-node-type kind)))
+              (and object (concat " " (treesit-node-text object t)))))))
+
+(defconst sql-ts--statement-regexp (rx bos "statement" eos)
+  "Regexp matching the type of a SQL statement node.")
+
 ;;;###autoload
 (define-derived-mode sql-ts-mode prog-mode "SQL"
   "Major mode for editing SQL, powered by tree-sitter."
-  :group 'sql
-  :syntax-table sql-mode-syntax-table
+  :abbrev-table sql-mode-abbrev-table
 
-  (when (treesit-ready-p 'sql)
+  ;; Taken from `sql-mode'.
+  (let ((sql-product (if (assq sql-product sql-product-alist)
+                         sql-product
+                       'ansi)))
+    (set-syntax-table (sql-product-syntax-table)))
+  (setq-local comment-start "--")
+  (setq-local syntax-propertize-function
+              (eval '(syntax-propertize-rules
+                      ((if (member sql-product '(mysql mariadb)) "\\\\'" "''")
+                       (0 (if (save-excursion
+                                (nth 3 (syntax-ppss (match-beginning 0))))
+                              (string-to-syntax ".")
+                            (forward-char -1)
+                            nil)))
+                      ("\\(/-\\)" (1 "."))
+                      ("\\(-\\*\\)"
+                       (1 (if (save-excursion
+                                (not (ppss-comment-depth
+                                      (syntax-ppss (match-beginning 1)))))
+                              (string-to-syntax ".")
+                            (forward-char -1)
+                            nil))))
+                    t))
+  (setq-local abbrev-all-caps 1)
+  (setq-local escaped-string-quote "'")
+  (setq-local sql-contains-names t)
+  (make-local-variable 'sql-buffer)
+
+  (when (and (or (not (fboundp 'treesit-ensure-installed)) ; Emacs 31.1
+                 (treesit-ensure-installed 'sql))
+             (treesit-ready-p 'sql))
     (setq treesit-primary-parser (treesit-parser-create 'sql))
-
-    ;; Comments.
-    (setq-local comment-start "--")
 
     ;; Indent.
     (setq-local indent-tabs-mode nil)
     (setq-local treesit-simple-indent-rules sql-ts--indent-rules)
 
     ;; Font-lock.
-    (setq-local treesit-font-lock-settings sql-ts-mode--font-lock-settings)
+    (setq-local treesit-font-lock-settings sql-ts--font-lock-settings)
     (setq-local treesit-font-lock-feature-list
                 '((comment keyword string)
-                  (builtin constant type function attribute)
-                  (bracket delimiter error operator)))
+                  (builtin constant type function attribute property variable number)
+                  (punctuation error)))
     ;; Imenu.
+    (setq-local treesit-defun-name-function #'sql-ts--defun-name)
     (setq-local treesit-simple-imenu-settings
-                `(("Statement" "\\`statement\\'" nil nil)))
+                `(("Statement" ,sql-ts--statement-regexp nil nil)))
+    (setq-local treesit-outline-predicate sql-ts--statement-regexp)
 
     ;; Navigation.
     (setq-local treesit-thing-settings
                 `((sql
-                   (defun "statement")
+                   (defun ,sql-ts--statement-regexp)
                    (list ,(rx bos (or
                                    "list"
                                    "column_definitions"
-                                   "select_expression")
+                                   "index_fields"
+                                   "function_arguments"
+                                   "subquery")
                               eos))
-                   (sexp ,(rx bos (or
-                                   "cte"
-                                   "select"
-                                   "update")
+                   (sexp ,(rx bos (or "statement" "select" "insert"
+                                      "update" "delete" "cte")
                               eos))
-                   (text (or comment "literal"))
-                   (comment ,(rx bos "comment" eos)))))
-
-    ;; Abbrev.
-    (setq-local local-abbrev-table sql-mode-abbrev-table)
-
+                   (sentence ,(rx bos (or "statement" "transaction") eos))
+                   (text ,(rx bos (or "comment" "marginalia" "literal") eos))
+                   (comment ,(rx bos (or "comment" "marginalia") eos)))))
     (treesit-major-mode-setup)))
 
-(when (fboundp 'derived-mode-add-parents)
-  (derived-mode-add-parents 'sql-ts-mode '(sql-mode)))
+(derived-mode-add-parents 'sql-ts-mode '(sql-mode))
 
-(when (treesit-ready-p 'sql)
-  (setq major-mode-remap-defaults
-        (assq-delete-all 'sql-mode major-mode-remap-defaults))
-  (add-to-list 'major-mode-remap-defaults
-               '(sql-mode . sql-ts-mode)))
+;;;###autoload
+(defun sql-ts-mode-maybe ()
+  "Enable `sql-ts-mode' when its grammar is available, `sql-mode' otherwise."
+  (let ((enabled (bound-and-true-p treesit-enabled-modes))) ; Emacs 31.1
+    (if (or (treesit-language-available-p 'sql)
+            (eq enabled t)
+            (memq 'sql-ts-mode enabled))
+        (sql-ts-mode)
+      (sql-mode))))
+
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.sql\\'" . sql-ts-mode-maybe))
+
+;;;###autoload
+(if (boundp 'treesit-major-mode-remap-alist)   ; Emacs 31.1
+    (add-to-list 'treesit-major-mode-remap-alist '(sql-mode . sql-ts-mode))
+  (add-to-list 'major-mode-remap-defaults '(sql-mode . sql-ts-mode)))
 
 (provide 'sql-ts-mode)
 ;;; sql-ts-mode.el ends here
